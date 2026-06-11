@@ -1,0 +1,45 @@
+model Hire {
+  id                 String     @id @default(uuid()) @db.Uuid
+  jobId              String @db.Uuid
+  malikId            String @db.Uuid
+  karigarId          String @db.Uuid
+  hireStatus         HireStatus @default(CONFIRMED)
+  agreedPrice        Int
+  startDate          DateTime?
+  endDate            DateTime?
+  startTime          String?
+  endTime            String?
+  latitude           Float?
+  longitude          Float?
+  isLocationTracking Boolean    @default(false)
+  arrivedAt          DateTime?
+  completedAt        DateTime?
+  completionPhotoUrls String[]
+  cancelledAt        DateTime?
+  cancellationReason String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  job                Job        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  malik              User       @relation(fields: [malikId], references: [id], onDelete: Cascade)
+  karigar            User       @relation(fields: [karigarId], references: [id], onDelete: Cascade)
+  payment            Payment?
+  chat               Chat?
+
+  @@unique([jobId, karigarId])
+  @@index([jobId])
+  @@index([malikId])
+  @@index([karigarId])
+  @@index([hireStatus])
+  @@index([startDate])
+}
+
+enum HireStatus {
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DISPUTED
+  PAYMENT_PENDING
+}

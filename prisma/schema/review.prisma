@@ -1,0 +1,30 @@
+model Review {
+  id                 String     @id @default(uuid()) @db.Uuid
+  hireId             String @db.Uuid
+  fromUserId         String @db.Uuid
+  toUserId           String @db.Uuid
+  rating             Float
+  comment            String?
+  categories         ReviewCategory[]
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  fromUser           User       @relation("ReviewFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser             User       @relation("ReviewTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@unique([hireId, fromUserId])
+  @@index([fromUserId])
+  @@index([toUserId])
+  @@index([rating])
+  @@index([createdAt])
+}
+
+enum ReviewCategory {
+  PROFESSIONALISM
+  QUALITY
+  PUNCTUALITY
+  COMMUNICATION
+  CLEANLINESS
+  RELIABILITY
+}

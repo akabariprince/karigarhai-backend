@@ -1,0 +1,611 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["prismaSchemaFolder"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Models
+model User {
+  id                 String     @id @default(uuid()) @db.Uuid
+  phone              String     @unique
+  role               UserRole   @default(KARIGAR)
+  fcmToken           String?
+  isVerified         Boolean    @default(false)
+  isProfileComplete  Boolean    @default(false)
+  isPhoneVerified    Boolean    @default(false)
+  passwordHash       String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  profile            Profile?
+  karigarProfile     KarigarProfile?
+  malikProfile       MalikProfile?
+  sessions           Session[]
+  otpLogs            OtpLog[]
+  jobs               Job[]
+  applications       JobApplication[]
+  hiresAsMalik       Hire[] @relation("HireMalik")
+  hiresAsKarigar     Hire[] @relation("HireKarigar")
+  chatsAsUser1       Chat[] @relation("ChatUser1")
+  chatsAsUser2       Chat[] @relation("ChatUser2")
+  messages           ChatMessage[]
+  reviews            Review[] @relation("ReviewFrom")
+  reviewsReceived    Review[] @relation("ReviewTo")
+  notifications      Notification[]
+  kycDocuments       KYCDocument[]
+  kycSubmissions     KYCSubmission[]
+  reviewedKycs       KYCSubmission[] @relation("KYCReviewer")
+  paymentsAsPayer    Payment[] @relation("PaymentPayer")
+  paymentsAsPayee    Payment[] @relation("PaymentPayee")
+
+  @@index([phone])
+  @@index([role])
+  @@index([isVerified])
+  @@index([isProfileComplete])
+}
+
+enum UserRole {
+  KARIGAR
+  MALIK
+  ADMIN
+}
+
+model Profile {
+  id                 String     @id @default(uuid()) @db.Uuid
+  userId             String     @unique @db.Uuid
+  firstName          String
+  lastName           String?
+  email              String?    @unique
+  dateOfBirth        DateTime?
+  gender             String?
+  profilePhotoUrl    String?
+  addressLine1       String?
+  addressLine2       String?
+  city               String
+  state              String
+  pincode            String
+  latitude           Float?
+  longitude          Float?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([city])
+  @@index([state])
+  @@index([pincode])
+}
+
+model Session {
+  id                 String     @id @default(uuid()) @db.Uuid
+  userId             String @db.Uuid
+  refreshTokenHash   String
+  deviceId           String
+  deviceType         String
+  ipAddress          String
+  userAgent          String?
+  expiresAt          DateTime
+  revokedAt          DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([deviceId])
+  @@index([expiresAt])
+  @@index([revokedAt])
+}
+
+model OtpLog {
+  id                 String     @id @default(uuid()) @db.Uuid
+  phone              String
+  hashedOtp          String
+  purpose            OtpPurpose
+  attempts           Int        @default(0)
+  verified           Boolean    @default(false)
+  expiresAt          DateTime
+  lockedUntil        DateTime?
+  ipAddress          String
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  user               User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId             String? @db.Uuid
+
+  @@index([phone])
+  @@index([purpose])
+  @@index([verified])
+  @@index([expiresAt])
+  @@index([lockedUntil])
+}
+
+enum OtpPurpose {
+  SIGNUP
+  LOGIN
+  PASSWORD_RESET
+  PHONE_VERIFICATION
+}
+
+// Karigar Models
+model KarigarProfile {
+  id                 String     @id @default(uuid()) @db.Uuid
+  userId             String     @unique @db.Uuid
+  bio                String?
+  trades             String[]   @default([])
+  experience         Int?
+  yearsActive        Int?
+  totalJobs          Int        @default(0)
+  totalHires         Int        @default(0)
+  totalEarnings      Float      @default(0)
+  averageRating      Float      @default(0)
+  totalReviews       Int        @default(0)
+  hourlyRate         Int?
+  dailyRate          Int?
+  isVerified         Boolean    @default(false)
+  isActive           Boolean    @default(true)
+  bankAccountNumber  String?
+  ifscCode           String?
+  bankName           String?
+  accountHolderName  String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portfolioItems     PortfolioItem[]
+
+  @@index([userId])
+  @@index([trades])
+  @@index([isVerified])
+  @@index([isActive])
+  @@index([averageRating])
+}
+
+model PortfolioItem {
+  id                 String     @id @default(uuid()) @db.Uuid
+  karigarId          String @db.Uuid
+  title              String
+  description        String?
+  photoUrl           String
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  karigarProfile     KarigarProfile @relation(fields: [karigarId], references: [id], onDelete: Cascade)
+
+  @@index([karigarId])
+}
+
+model MalikProfile {
+  id                 String     @id @default(uuid()) @db.Uuid
+  userId             String     @unique @db.Uuid
+  businessName       String
+  businessCategory   String?
+  businessDescription String?
+  totalJobs          Int        @default(0)
+  totalHires         Int        @default(0)
+  totalSpent         Float      @default(0)
+  averageRating      Float      @default(0)
+  totalReviews       Int        @default(0)
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+  companyRegistration String?
+  gstNumber          String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([verificationStatus])
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+// Job Models
+model Job {
+  id                 String     @id @default(uuid()) @db.Uuid
+  malikId            String @db.Uuid
+  title              String
+  description        String
+  category           String
+  trades             String[]
+  priceType          PriceType
+  fixedPrice         Int?
+  hourlyRate         Int?
+  dailyRate          Int?
+  totalDays          Int?
+  startDate          DateTime?
+  endDate            DateTime?
+  latitude           Float
+  longitude          Float
+  locality           String
+  city               String
+  state              String
+  pincode            String
+  requiredSkills     String[]
+  status             JobStatus    @default(OPEN)
+  totalApplications  Int         @default(0)
+  selectedCount      Int         @default(0)
+  imageUrls          String[]
+  voiceNoteUrl       String?
+  workRadius         Int         @default(5)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  deletedAt          DateTime?
+
+  malik              User        @relation(fields: [malikId], references: [id], onDelete: Cascade)
+  applications       JobApplication[]
+  hires              Hire[]
+
+  @@index([malikId])
+  @@index([status])
+  @@index([category])
+  @@index([trades])
+  @@index([city])
+  @@index([state])
+  @@index([latitude])
+  @@index([longitude])
+  @@index([createdAt])
+}
+
+enum JobStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+enum PriceType {
+  FIXED
+  HOURLY
+  DAILY
+}
+
+model JobApplication {
+  id                 String     @id @default(uuid()) @db.Uuid
+  jobId              String @db.Uuid
+  karigarId          String @db.Uuid
+  applicationStatus  ApplicationStatus @default(APPLIED)
+  coverLetter        String?
+  appliedAt          DateTime    @default(now())
+  shortlistedAt      DateTime?
+  rejectedAt         DateTime?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  deletedAt          DateTime?
+
+  job                Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  karigar            User        @relation(fields: [karigarId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, karigarId])
+  @@index([jobId])
+  @@index([karigarId])
+  @@index([applicationStatus])
+  @@index([appliedAt])
+}
+
+enum ApplicationStatus {
+  APPLIED
+  SHORTLISTED
+  REJECTED
+  HIRED
+  COMPLETED
+  DISPUTED
+}
+
+// Hire Models
+model Hire {
+  id                 String     @id @default(uuid()) @db.Uuid
+  jobId              String @db.Uuid
+  malikId            String @db.Uuid
+  karigarId          String @db.Uuid
+  hireStatus         HireStatus @default(CONFIRMED)
+  agreedPrice        Int
+  startDate          DateTime?
+  endDate            DateTime?
+  startTime          String?
+  endTime            String?
+  latitude           Float?
+  longitude          Float?
+  isLocationTracking Boolean    @default(false)
+  arrivedAt          DateTime?
+  completedAt        DateTime?
+  completionPhotoUrls String[]
+  cancelledAt        DateTime?
+  cancellationReason String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  job                Job        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  malik              User       @relation("HireMalik", fields: [malikId], references: [id], onDelete: Cascade)
+  karigar            User       @relation("HireKarigar", fields: [karigarId], references: [id], onDelete: Cascade)
+  payment            Payment?
+  chat               Chat?
+
+  @@unique([jobId, karigarId])
+  @@index([jobId])
+  @@index([malikId])
+  @@index([karigarId])
+  @@index([hireStatus])
+  @@index([startDate])
+}
+
+enum HireStatus {
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DISPUTED
+  PAYMENT_PENDING
+}
+
+// Payment Models
+model Payment {
+  id                 String     @id @default(uuid()) @db.Uuid
+  hireId             String     @unique @db.Uuid
+  payerId            String @db.Uuid
+  payeeId            String @db.Uuid
+  grossAmount        Int
+  platformFee        Int
+  karigarAmount      Int
+  paymentStatus      PaymentStatus @default(PENDING)
+  razorpayOrderId    String?
+  razorpayPaymentId  String?
+  razorpayTransferId String?
+  disputeRaisedAt    DateTime?
+  disputeReason      String?
+  disputeResolution  String?
+  resolvedAt         DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  hire               Hire       @relation(fields: [hireId], references: [id], onDelete: Cascade)
+  payer              User       @relation("PaymentPayer", fields: [payerId], references: [id], onDelete: Cascade)
+  payee              User       @relation("PaymentPayee", fields: [payeeId], references: [id], onDelete: Cascade)
+
+  @@index([hireId])
+  @@index([payerId])
+  @@index([payeeId])
+  @@index([paymentStatus])
+  @@index([createdAt])
+}
+
+enum PaymentStatus {
+  PENDING
+  ESCROW_DEPOSITED
+  RELEASED_TO_KARIGAR
+  REFUNDED
+  DISPUTED
+  PARTIALLY_RELEASED
+}
+
+// Chat Models
+model Chat {
+  id                 String     @id @default(uuid()) @db.Uuid
+  hireId             String     @unique @db.Uuid
+  user1Id            String @db.Uuid
+  user2Id            String @db.Uuid
+  lastMessageAt      DateTime?
+  lastMessage        String?
+  isArchivedUser1    Boolean    @default(false)
+  isArchivedUser2    Boolean    @default(false)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  hire               Hire       @relation(fields: [hireId], references: [id], onDelete: Cascade)
+  user1              User       @relation("ChatUser1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2              User       @relation("ChatUser2", fields: [user2Id], references: [id], onDelete: Cascade)
+  messages           ChatMessage[]
+
+  @@index([hireId])
+  @@index([user1Id])
+  @@index([user2Id])
+  @@index([lastMessageAt])
+}
+
+model ChatMessage {
+  id                 String     @id @default(uuid()) @db.Uuid
+  chatId             String @db.Uuid
+  senderId           String @db.Uuid
+  type               MessageType
+  text               String?
+  mediaUrl           String?
+  mediaDuration      Int?
+  metadata           String?
+  isRead             Boolean    @default(false)
+  readAt             DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  chat               Chat       @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender             User       @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+  @@index([senderId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VOICE
+  FILE
+  SYSTEM
+}
+
+// Review Models
+model Review {
+  id                 String     @id @default(uuid()) @db.Uuid
+  hireId             String @db.Uuid
+  fromUserId         String @db.Uuid
+  toUserId           String @db.Uuid
+  rating             Float
+  comment            String?
+  categories         ReviewCategory[]
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  fromUser           User       @relation("ReviewFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser             User       @relation("ReviewTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@unique([hireId, fromUserId])
+  @@index([fromUserId])
+  @@index([toUserId])
+  @@index([rating])
+  @@index([createdAt])
+}
+
+enum ReviewCategory {
+  PROFESSIONALISM
+  QUALITY
+  PUNCTUALITY
+  COMMUNICATION
+  CLEANLINESS
+  RELIABILITY
+}
+
+// Notification Models
+model Notification {
+  id                 String     @id @default(uuid()) @db.Uuid
+  userId             String @db.Uuid
+  type               NotificationType
+  title              String
+  body               String
+  data               String?
+  isRead             Boolean    @default(false)
+  readAt             DateTime?
+  sentAt             DateTime   @default(now())
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([isRead])
+  @@index([sentAt])
+}
+
+enum NotificationType {
+  APPLICATION_RECEIVED
+  APPLICATION_SHORTLISTED
+  APPLICATION_HIRED
+  APPLICATION_REJECTED
+  PAYMENT_RECEIVED
+  PAYMENT_RELEASED
+  KYC_APPROVED
+  KYC_REJECTED
+  JOB_REMINDER
+  HIRE_CONFIRMED
+  MESSAGE_RECEIVED
+  HIRE_COMPLETED
+  REVIEW_RECEIVED
+}
+
+// KYC Models
+model KYCDocument {
+  id                 String     @id @default(uuid()) @db.Uuid
+  userId             String     @db.Uuid
+  documentType       KYCDocumentType
+  r2FileKey          String     @unique // Cloudflare R2 file key
+  fileName           String     // Original file name
+  fileSizeBytes      Int        // File size in bytes
+  mimeType           String     @default("image/jpeg")
+  uploadedAt         DateTime   @default(now())
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentType])
+  @@index([userId])
+  @@index([documentType])
+}
+
+enum KYCDocumentType {
+  AADHAAR_FRONT
+  AADHAAR_BACK
+  PAN_CARD
+  BANK_STATEMENT
+  PROFILE_PHOTO
+}
+
+model KYCSubmission {
+  id                 String     @id @default(uuid()) @db.Uuid
+  userId             String @db.Uuid
+  submissionStatus   KYCSubmissionStatus @default(PENDING)
+  aadhaarNumberEncrypted String?
+  panNumber          String?
+  bankName           String?
+  accountNumber      String?
+  ifscCode           String?
+  reviewedBy         String? @db.Uuid
+  rejectionReason    String?
+  approvedAt         DateTime?
+  rejectedAt         DateTime?
+  submittedAt        DateTime   @default(now())
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewer           User?      @relation("KYCReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([submissionStatus])
+  @@index([submittedAt])
+}
+
+enum KYCSubmissionStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  RESUBMIT_REQUIRED
+}
+
+model WhatsAppMessage {
+  id             String            @id @default(uuid()) @db.Uuid
+  waMessageId    String            @unique
+  phoneNumber    String
+  content        String?
+  messageType    String            // TEXT, IMAGE, AUDIO, VIDEO, DOCUMENT, etc.
+  direction      WhatsAppDirection
+  conversationId String?
+  timestamp      DateTime
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([phoneNumber])
+  @@index([timestamp])
+  @@index([waMessageId])
+}
+
+enum WhatsAppDirection {
+  INCOMING
+  OUTGOING
+}
+

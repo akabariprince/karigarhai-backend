@@ -1,0 +1,79 @@
+model KarigarProfile {
+  id                 String     @id @default(uuid()) @db.Uuid
+  userId             String     @unique @db.Uuid
+  bio                String?
+  trades             String[]   @default([])
+  experience         Int?
+  yearsActive        Int?
+  totalJobs          Int        @default(0)
+  totalHires         Int        @default(0)
+  totalEarnings      Float      @default(0)
+  averageRating      Float      @default(0)
+  totalReviews       Int        @default(0)
+  hourlyRate         Int?
+  dailyRate          Int?
+  isVerified         Boolean    @default(false)
+  isActive           Boolean    @default(true)
+  bankAccountNumber  String?    // Encrypted
+  ifscCode           String?
+  bankName           String?
+  accountHolderName  String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portfolioItems     PortfolioItem[]
+
+  @@index([userId])
+  @@index([trades])
+  @@index([isVerified])
+  @@index([isActive])
+  @@index([averageRating])
+}
+
+model PortfolioItem {
+  id                 String     @id @default(uuid()) @db.Uuid
+  karigarId          String @db.Uuid
+  title              String
+  description        String?
+  photoUrl           String
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  karigarProfile     KarigarProfile @relation(fields: [karigarId], references: [id], onDelete: Cascade)
+
+  @@index([karigarId])
+}
+
+model MalikProfile {
+  id                 String     @id @default(uuid()) @db.Uuid
+  userId             String     @unique @db.Uuid
+  businessName       String
+  businessCategory   String?
+  businessDescription String?
+  totalJobs          Int        @default(0)
+  totalHires         Int        @default(0)
+  totalSpent         Float      @default(0)
+  averageRating      Float      @default(0)
+  totalReviews       Int        @default(0)
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+  companyRegistration String?
+  gstNumber          String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([verificationStatus])
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}

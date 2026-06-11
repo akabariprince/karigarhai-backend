@@ -1,0 +1,91 @@
+model Job {
+  id                 String     @id @default(uuid()) @db.Uuid
+  malikId            String @db.Uuid
+  title              String
+  description        String
+  category           String
+  trades             String[]
+  priceType          PriceType
+  fixedPrice         Int?
+  hourlyRate         Int?
+  dailyRate          Int?
+  totalDays          Int?
+  startDate          DateTime?
+  endDate            DateTime?
+  latitude           Float
+  longitude          Float
+  locality           String
+  city               String
+  state              String
+  pincode            String
+  requiredSkills     String[]
+  status             JobStatus    @default(OPEN)
+  totalApplications  Int         @default(0)
+  selectedCount      Int         @default(0)
+  imageUrls          String[]
+  voiceNoteUrl       String?
+  workRadius         Int         @default(5)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  deletedAt          DateTime?
+
+  malik              User        @relation(fields: [malikId], references: [id], onDelete: Cascade)
+  applications       JobApplication[]
+  hires              Hire[]
+
+  @@index([malikId])
+  @@index([status])
+  @@index([category])
+  @@index([trades])
+  @@index([city])
+  @@index([state])
+  @@index([latitude])
+  @@index([longitude])
+  @@index([createdAt])
+}
+
+enum JobStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+enum PriceType {
+  FIXED
+  HOURLY
+  DAILY
+}
+
+model JobApplication {
+  id                 String     @id @default(uuid()) @db.Uuid
+  jobId              String @db.Uuid
+  karigarId          String @db.Uuid
+  applicationStatus  ApplicationStatus @default(APPLIED)
+  coverLetter        String?
+  appliedAt          DateTime    @default(now())
+  shortlistedAt      DateTime?
+  rejectedAt         DateTime?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  deletedAt          DateTime?
+
+  job                Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  karigar            User        @relation(fields: [karigarId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, karigarId])
+  @@index([jobId])
+  @@index([karigarId])
+  @@index([applicationStatus])
+  @@index([appliedAt])
+}
+
+enum ApplicationStatus {
+  APPLIED
+  SHORTLISTED
+  REJECTED
+  HIRED
+  COMPLETED
+  DISPUTED
+}

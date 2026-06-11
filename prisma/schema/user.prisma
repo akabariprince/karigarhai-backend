@@ -1,0 +1,121 @@
+model User {
+  id                 String     @id @default(uuid()) @db.Uuid
+  phone              String     @unique
+  role               UserRole   @default(KARIGAR)
+  fcmToken           String?
+  isVerified         Boolean    @default(false)
+  isProfileComplete  Boolean    @default(false)
+  isPhoneVerified    Boolean    @default(false)
+  passwordHash       String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  // Relations
+  profile            Profile?
+  karigarProfile     KarigarProfile?
+  malikProfile       MalikProfile?
+  sessions           Session[]
+  otpLogs            OtpLog[]
+  jobs               Job[]
+  applications       JobApplication[]
+  hires              Hire[]
+  payments           Payment[]
+  chats              Chat[]
+  messages           ChatMessage[]
+  reviews            Review[] @relation("ReviewFrom")
+  reviewsReceived    Review[] @relation("ReviewTo")
+  notifications      Notification[]
+  kycDocuments       KYCDocument[]
+  kycSubmissions     KYCSubmission[]
+
+  @@index([phone])
+  @@index([role])
+  @@index([isVerified])
+  @@index([isProfileComplete])
+}
+
+enum UserRole {
+  KARIGAR
+  MALIK
+  ADMIN
+}
+
+model Profile {
+  id                 String     @id @default(uuid()) @db.Uuid
+  userId             String     @unique @db.Uuid
+  firstName          String
+  lastName           String?
+  email              String?    @unique
+  dateOfBirth        DateTime?
+  gender             String?
+  profilePhotoUrl    String?
+  addressLine1       String?
+  addressLine2       String?
+  city               String
+  state              String
+  pincode            String
+  latitude           Float?
+  longitude          Float?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([city])
+  @@index([state])
+  @@index([pincode])
+}
+
+model Session {
+  id                 String     @id @default(uuid()) @db.Uuid
+  userId             String @db.Uuid
+  refreshTokenHash   String
+  deviceId           String
+  deviceType         String
+  ipAddress          String
+  userAgent          String?
+  expiresAt          DateTime
+  revokedAt          DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([deviceId])
+  @@index([expiresAt])
+  @@index([revokedAt])
+}
+
+model OtpLog {
+  id                 String     @id @default(uuid()) @db.Uuid
+  phone              String
+  hashedOtp          String
+  purpose            OtpPurpose
+  attempts           Int        @default(0)
+  verified           Boolean    @default(false)
+  expiresAt          DateTime
+  lockedUntil        DateTime?
+  ipAddress          String
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  user               User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId             String? @db.Uuid
+
+  @@index([phone])
+  @@index([purpose])
+  @@index([verified])
+  @@index([expiresAt])
+  @@index([lockedUntil])
+}
+
+enum OtpPurpose {
+  SIGNUP
+  LOGIN
+  PASSWORD_RESET
+  PHONE_VERIFICATION
+}

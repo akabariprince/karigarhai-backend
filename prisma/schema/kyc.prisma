@@ -1,0 +1,61 @@
+model KYCDocument {
+  id                 String     @id @default(uuid()) @db.Uuid
+  userId             String @db.Uuid
+  documentType       KYCDocumentType
+  r2FileKey          String     @unique // Cloudflare R2 file key
+  fileName           String     // Original file name
+  fileSizeBytes      Int        // File size in bytes
+  mimeType           String     @default("image/jpeg")
+  uploadedAt         DateTime   @default(now())
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentType])
+  @@index([userId])
+  @@index([documentType])
+}
+
+enum KYCDocumentType {
+  AADHAAR_FRONT
+  AADHAAR_BACK
+  PAN_CARD
+  BANK_STATEMENT
+  PROFILE_PHOTO
+}
+
+model KYCSubmission {
+  id                 String     @id @default(uuid()) @db.Uuid
+  userId             String @db.Uuid
+  submissionStatus   KYCSubmissionStatus @default(PENDING)
+  aadhaarNumberEncrypted String?
+  panNumber          String?
+  bankName           String?
+  accountNumber      String?    // Last 4 digits only
+  ifscCode           String?
+  reviewedBy         String? @db.Uuid
+  rejectionReason    String?
+  approvedAt         DateTime?
+  rejectedAt         DateTime?
+  submittedAt        DateTime   @default(now())
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewer           User?      @relation("KYCReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([submissionStatus])
+  @@index([submittedAt])
+}
+
+enum KYCSubmissionStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  RESUBMIT_REQUIRED
+}

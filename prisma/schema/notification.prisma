@@ -1,0 +1,37 @@
+model Notification {
+  id                 String     @id @default(uuid()) @db.Uuid
+  userId             String @db.Uuid
+  type               NotificationType
+  title              String
+  body               String
+  data               String?    // JSON string for deep linking
+  isRead             Boolean    @default(false)
+  readAt             DateTime?
+  sentAt             DateTime   @default(now())
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([isRead])
+  @@index([sentAt])
+}
+
+enum NotificationType {
+  APPLICATION_RECEIVED
+  APPLICATION_SHORTLISTED
+  APPLICATION_HIRED
+  APPLICATION_REJECTED
+  PAYMENT_RECEIVED
+  PAYMENT_RELEASED
+  KYC_APPROVED
+  KYC_REJECTED
+  JOB_REMINDER
+  HIRE_CONFIRMED
+  MESSAGE_RECEIVED
+  HIRE_COMPLETED
+  REVIEW_RECEIVED
+}
