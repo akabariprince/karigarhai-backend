@@ -1398,6 +1398,229 @@ Resolve payment dispute.
 
 ---
 
+## WhatsApp API
+
+### GET /whatsapp/webhook
+Verification endpoint for Meta WhatsApp webhook challenge setup.
+
+**Query**: `?hub.mode=subscribe&hub.verify_token=karigarhai_verify_token&hub.challenge=1158201444`
+
+**Response (200)**:
+```
+1158201444
+```
+
+---
+
+### POST /whatsapp/webhook
+Receive incoming messages webhook event payload from Meta Cloud API.
+
+**Request**:
+```json
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "123456789",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "16505551111",
+              "phone_number_id": "123456123"
+            },
+            "contacts": [
+              {
+                "profile": {
+                  "name": "John Doe"
+                },
+                "wa_id": "919876543210"
+              }
+            ],
+            "messages": [
+              {
+                "from": "919876543210",
+                "id": "ABGGFlKwvjpaAgl2C3E5A2b15",
+                "timestamp": "1609459200",
+                "text": {
+                  "body": "Hello! I need a plumber in Satellite locality."
+                },
+                "type": "text"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Response (200)**:
+```json
+{
+  "success": true
+}
+```
+
+---
+
+### GET /whatsapp/conversations
+Get list of all active WhatsApp conversations (Admin only).
+
+**Headers**: `Authorization: Bearer {accessToken}`
+
+**Response (200)**:
+```json
+{
+  "success": true,
+  "message": "Conversations fetched successfully",
+  "data": [
+    {
+      "phoneNumber": "+916359557449",
+      "lastMessage": "Hello from KarigarHai Admin!",
+      "messageType": "TEXT",
+      "direction": "OUTGOING",
+      "timestamp": "2026-06-12T10:35:19.000Z",
+      "waMessageId": "wamid.HBgLMTYzMTU1NTExODEVAgASGBQ...",
+      "unreadCount": 0,
+      "user": {
+        "userId": "eb57f3b8-69ff-4aab-b2eb-3df67bf172fd",
+        "name": "Maganbhai Patel",
+        "role": "KARIGAR",
+        "isVerified": true,
+        "kycStatus": "APPROVED",
+        "rating": 4.5,
+        "city": "Ahmedabad"
+      }
+    }
+  ]
+}
+```
+
+---
+
+### GET /whatsapp/conversations/:phoneNumber
+Get conversation message history log (Admin only).
+
+**Headers**: `Authorization: Bearer {accessToken}`
+
+**Query**: `?limit=50&offset=0`
+
+**Response (200)**:
+```json
+{
+  "success": true,
+  "message": "Conversation history fetched successfully",
+  "data": [
+    {
+      "id": "8c37ef26-b745-4269-997b-544174a18d6b",
+      "waMessageId": "wamid.HBgLMTYzMTU1NTExODEVAgASGBQ...",
+      "phoneNumber": "+916359557449",
+      "content": "Hello! I need a plumber in Satellite locality.",
+      "messageType": "TEXT",
+      "direction": "INCOMING",
+      "isRead": true,
+      "conversationId": "1072186955987324",
+      "timestamp": "2026-06-12T10:30:00.000Z",
+      "createdAt": "2026-06-12T10:30:01.000Z",
+      "updatedAt": "2026-06-12T10:35:19.000Z"
+    }
+  ]
+}
+```
+
+---
+
+### GET /whatsapp/conversations/:phoneNumber/user-info
+Get registered user details and metrics by phone number (Admin only).
+
+**Headers**: `Authorization: Bearer {accessToken}`
+
+**Response (200)**:
+```json
+{
+  "success": true,
+  "message": "User details fetched successfully",
+  "data": {
+    "userId": "eb57f3b8-69ff-4aab-b2eb-3df67bf172fd",
+    "name": "Maganbhai Patel",
+    "role": "KARIGAR",
+    "isVerified": true,
+    "kycStatus": "APPROVED",
+    "rating": 4.5,
+    "city": "Ahmedabad",
+    "state": "Gujarat",
+    "email": "magan@example.com",
+    "createdAt": "2026-01-01T12:00:00.000Z",
+    "experience": 5,
+    "totalJobs": 12,
+    "totalHires": 12,
+    "totalEarnings": 25000,
+    "hourlyRate": 150,
+    "dailyRate": 1200,
+    "trades": ["PLUMBER"]
+  }
+}
+```
+
+---
+
+### PATCH /whatsapp/conversations/:phoneNumber/read
+Mark all incoming messages in a conversation as read (Admin only).
+
+**Headers**: `Authorization: Bearer {accessToken}`
+
+**Response (200)**:
+```json
+{
+  "success": true,
+  "message": "Conversation marked as read successfully",
+  "data": {
+    "count": 2
+  }
+}
+```
+
+---
+
+### POST /whatsapp/send
+Send free-form WhatsApp message using Meta Cloud API and record in DB (Admin only).
+
+**Headers**: `Authorization: Bearer {accessToken}`
+
+**Request**:
+```json
+{
+  "phoneNumber": "+916359557449",
+  "text": "Hello from KarigarHai Admin! We have noted your request and a plumber has been assigned."
+}
+```
+
+**Response (201)**:
+```json
+{
+  "success": true,
+  "message": "Message sent and stored successfully",
+  "data": {
+    "id": "1bf98d4b-741d-496f-9a9f-fd55650a99b3",
+    "waMessageId": "wamid.HBgLMTYzMTU1NTExODEVAgASGBQ...",
+    "phoneNumber": "+916359557449",
+    "content": "Hello from KarigarHai Admin! We have noted your request and a plumber has been assigned.",
+    "messageType": "TEXT",
+    "direction": "OUTGOING",
+    "conversationId": "1072186955987324",
+    "timestamp": "2026-06-12T10:35:19.000Z",
+    "createdAt": "2026-06-12T10:35:19.000Z",
+    "updatedAt": "2026-06-12T10:35:19.000Z"
+  }
+}
+```
+
+---
+
 ## Socket.io Events
 
 **Connection**:
@@ -1425,6 +1648,12 @@ socket.connect();
 **Online Status**:
 - `user:ping` - Update online status
 - `user:onlineStatus` - Receive online status
+
+**WhatsApp Admin Panel Events**:
+- `join_admin_whatsapp` (Client event): Join the `admin_whatsapp` room to receive real-time updates.
+- `whatsapp:message` (Server event): Broadcasted when a new message is received or sent. Contains `WhatsAppMessage` object.
+- `whatsapp:conversation` (Server event): Broadcasted when a conversation details update. Contains `WhatsAppConversation` object (includes unreadCount, lastMessage, user metrics).
+- `whatsapp:read` (Server event): Broadcasted when a conversation is marked as read. Payload format: `{ phoneNumber: string }`.
 
 ---
 

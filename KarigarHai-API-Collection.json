@@ -2258,6 +2258,60 @@
           "response": []
         },
         {
+          "name": "Get Registered User Info (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/whatsapp/conversations/+919876543210/user-info",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "whatsapp",
+                "conversations",
+                "+919876543210",
+                "user-info"
+              ]
+            },
+            "description": "Retrieve registered worker or employer profile metrics matching the phone number."
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Conversation as Read (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_jwt_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/whatsapp/conversations/+919876543210/read",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "whatsapp",
+                "conversations",
+                "+919876543210",
+                "read"
+              ]
+            },
+            "description": "Mark all incoming unread messages in the conversation as read."
+          },
+          "response": []
+        },
+        {
           "name": "Send WhatsApp Message (Admin)",
           "request": {
             "method": "POST",

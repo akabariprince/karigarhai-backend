@@ -1,9 +1,10 @@
 import axios from 'axios';
 import { prisma } from '../../config/database';
 import { env } from '../../config/env';
-import { formatWhatsappPhone } from '../../shared/utils/whatsapp.util';
+import { formatWhatsappPhone, formatPhoneForDb } from '../../shared/utils/whatsapp.util';
 import { NotFoundError, ValidationError } from '../../shared/errors/AppError';
 import logger from '../../shared/middleware/logger.middleware';
+import { emitToAdminWhatsapp } from '../../config/socket';
 
 export class WhatsappService {
   /**
@@ -23,23 +24,33 @@ export class WhatsappService {
    * Handle incoming Webhook payload from Meta
    */
   async handleWebhookPayload(payload: any): Promise<void> {
-    if (payload.object !== 'whatsapp_business_account') {
-      return;
-    }
+    logger.info('Received WhatsApp Webhook payload: %j', payload);
+    try {
+      if (payload.object !== 'whatsapp_business_account') {
+        logger.warn(`Unexpected Webhook payload object: ${payload.object}`);
+        return;
+      }
 
-    const entries = payload.entry || [];
-    for (const entry of entries) {
-      const changes = entry.changes || [];
-      for (const change of changes) {
-        if (change.field !== 'messages') continue;
+      const entries = payload.entry || [];
+      for (const entry of entries) {
+        const changes = entry.changes || [];
+        for (const change of changes) {
+          if (change.field !== 'messages') continue;
 
-        const value = change.value || {};
-        const messages = value.messages || [];
+          const value = change.value || {};
+          const messages = value.messages || [];
 
-        for (const msg of messages) {
-          await this.processIncomingMessage(msg, value);
+          for (const msg of messages) {
+            try {
+              await this.processIncomingMessage(msg, value);
+            } catch (msgErr) {
+              logger.error('Error processing incoming WhatsApp message:', msgErr);
+            }
+          }
         }
       }
+    } catch (err) {
+      logger.error('Error handling WhatsApp Webhook payload:', err);
     }
   }
 
@@ -47,8 +58,13 @@ export class WhatsappService {
    * Process a single incoming message: check duplicate, store in db, then trigger potential bot response
    */
   private async processIncomingMessage(msg: any, value: any): Promise<void> {
+    if (!msg || !msg.id || !msg.from) {
+      logger.warn('Skipping incoming message due to missing required fields (id or from): %j', msg);
+      return;
+    }
+
     const waMessageId = msg.id;
-    const phoneNumber = '+' + msg.from; // Add + for standard database formatting
+    const phoneNumber = formatPhoneForDb(msg.from);
     const timestamp = msg.timestamp ? new Date(parseInt(msg.timestamp) * 1000) : new Date();
     const messageType = (msg.type || 'TEXT').toUpperCase();
     
@@ -71,7 +87,7 @@ export class WhatsappService {
     } else if (msg.type === 'interactive') {
       content = msg.interactive?.button_reply?.title || msg.interactive?.list_reply?.title || '[Interactive Response]';
     } else {
-      content = `[${msg.type.toUpperCase()} Message]`;
+      content = `[${messageType} Message]`;
     }
 
     const conversationId = value.metadata?.phone_number_id || null;
@@ -100,6 +116,34 @@ export class WhatsappService {
     });
 
     logger.info(`Saved incoming WhatsApp message: ${storedMessage.id} from ${phoneNumber}`);
+
+    // Broadcast incoming message via Socket.IO
+    try {
+      const unreadCount = await prisma.whatsAppMessage.count({
+        where: {
+          phoneNumber,
+          direction: 'INCOMING',
+          isRead: false
+        }
+      });
+
+      const user = await this.getUserInfoByPhone(phoneNumber);
+      const conversationUpdate = {
+        phoneNumber,
+        lastMessage: content,
+        messageType,
+        direction: 'INCOMING',
+        timestamp: timestamp.toISOString(),
+        waMessageId,
+        user,
+        unreadCount
+      };
+
+      emitToAdminWhatsapp('whatsapp:message', storedMessage);
+      emitToAdminWhatsapp('whatsapp:conversation', conversationUpdate);
+    } catch (socketErr) {
+      logger.error('Error broadcasting incoming WhatsApp message via Socket.IO:', socketErr);
+    }
 
     // Step 2: Trigger bot / AI reply processing (if any)
     try {
@@ -155,7 +199,7 @@ export class WhatsappService {
       const waMessageId = responseData.messages?.[0]?.id || `out_${Date.now()}`;
       
       // Persist the outgoing message
-      const dbPhone = toPhone.startsWith('+') ? toPhone : `+${toPhone}`;
+      const dbPhone = formatPhoneForDb(toPhone);
       const storedMessage = await prisma.whatsAppMessage.create({
         data: {
           waMessageId,
@@ -169,6 +213,27 @@ export class WhatsappService {
       });
 
       logger.info(`Persisted outgoing WhatsApp message: ${storedMessage.id} to ${dbPhone}`);
+
+      // Broadcast outgoing message via Socket.IO
+      try {
+        const user = await this.getUserInfoByPhone(dbPhone);
+        const conversationUpdate = {
+          phoneNumber: dbPhone,
+          lastMessage: text,
+          messageType: 'TEXT',
+          direction: 'OUTGOING',
+          timestamp: storedMessage.timestamp.toISOString(),
+          waMessageId,
+          user,
+          unreadCount: 0
+        };
+
+        emitToAdminWhatsapp('whatsapp:message', storedMessage);
+        emitToAdminWhatsapp('whatsapp:conversation', conversationUpdate);
+      } catch (socketErr) {
+        logger.error('Error broadcasting outgoing WhatsApp message via Socket.IO:', socketErr);
+      }
+
       return storedMessage;
 
     } catch (err: any) {
@@ -181,16 +246,11 @@ export class WhatsappService {
    * Retrieve all messages (history) for a specific phone number
    */
   async getConversationHistory(phoneNumber: string, limit = 50, offset = 0) {
-    const dbPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
-    const cleanPhone = phoneNumber.replace('+', ''); // also check without + if stored differently
+    const dbPhone = formatPhoneForDb(phoneNumber);
 
     const messages = await prisma.whatsAppMessage.findMany({
       where: {
-        OR: [
-          { phoneNumber: dbPhone },
-          { phoneNumber: phoneNumber },
-          { phoneNumber: '+' + cleanPhone }
-        ]
+        phoneNumber: dbPhone
       },
       orderBy: {
         timestamp: 'asc'
@@ -226,7 +286,145 @@ export class WhatsappService {
       ORDER BY "phoneNumber", "timestamp" DESC
     `;
 
-    // Sort by last message timestamp descending
-    return conversations.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    // Fetch matching registered users to enrich details
+    const phoneNumbers = conversations.map(c => c.phoneNumber);
+    const users = await prisma.user.findMany({
+      where: { phone: { in: phoneNumbers } },
+      include: {
+        profile: true,
+        karigarProfile: true,
+        malikProfile: true,
+        kycSubmissions: {
+          orderBy: { createdAt: 'desc' },
+          take: 1
+        }
+      }
+    });
+
+    const userMap = new Map<string, any>();
+    for (const u of users) {
+      userMap.set(u.phone, {
+        userId: u.id,
+        name: u.profile ? `${u.profile.firstName} ${u.profile.lastName || ''}`.trim() : null,
+        role: u.role,
+        isVerified: u.isVerified,
+        kycStatus: u.kycSubmissions?.[0]?.submissionStatus || null,
+        rating: u.role === 'KARIGAR' ? u.karigarProfile?.averageRating : u.role === 'MALIK' ? u.malikProfile?.averageRating : null,
+        city: u.profile?.city || null
+      });
+    }
+
+    // Query unread incoming messages counts grouped by phone
+    const unreadCounts = await prisma.whatsAppMessage.groupBy({
+      by: ['phoneNumber'],
+      where: {
+        direction: 'INCOMING',
+        isRead: false
+      },
+      _count: {
+        id: true
+      }
+    });
+
+    const unreadMap = new Map<string, number>();
+    for (const item of unreadCounts) {
+      unreadMap.set(item.phoneNumber, item._count.id);
+    }
+
+    const enriched = conversations.map(c => ({
+      ...c,
+      unreadCount: unreadMap.get(c.phoneNumber) || 0,
+      user: userMap.get(c.phoneNumber) || null
+    }));
+
+    return enriched.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  }
+
+  /**
+   * Get registered user details by phone number
+   */
+  async getUserInfoByPhone(phoneNumber: string) {
+    const dbPhone = formatPhoneForDb(phoneNumber);
+    const u = await prisma.user.findUnique({
+      where: { phone: dbPhone },
+      include: {
+        profile: true,
+        karigarProfile: true,
+        malikProfile: true,
+        kycSubmissions: {
+          orderBy: { createdAt: 'desc' },
+          take: 1
+        }
+      }
+    });
+
+    if (!u) return null;
+
+    const commonData = {
+      userId: u.id,
+      name: u.profile ? `${u.profile.firstName} ${u.profile.lastName || ''}`.trim() : null,
+      role: u.role,
+      isVerified: u.isVerified,
+      kycStatus: u.kycSubmissions?.[0]?.submissionStatus || null,
+      rating: u.role === 'KARIGAR' ? u.karigarProfile?.averageRating : u.role === 'MALIK' ? u.malikProfile?.averageRating : null,
+      city: u.profile?.city || null,
+      state: u.profile?.state || null,
+      email: u.profile?.email || null,
+      createdAt: u.createdAt
+    };
+
+    if (u.role === 'KARIGAR' && u.karigarProfile) {
+      return {
+        ...commonData,
+        experience: u.karigarProfile.experience,
+        totalJobs: u.karigarProfile.totalJobs,
+        totalHires: u.karigarProfile.totalHires,
+        totalEarnings: u.karigarProfile.totalEarnings,
+        hourlyRate: u.karigarProfile.hourlyRate,
+        dailyRate: u.karigarProfile.dailyRate,
+        trades: u.karigarProfile.trades,
+      };
+    }
+
+    if (u.role === 'MALIK' && u.malikProfile) {
+      return {
+        ...commonData,
+        businessName: u.malikProfile.businessName,
+        businessCategory: u.malikProfile.businessCategory,
+        businessDescription: u.malikProfile.businessDescription,
+        totalJobs: u.malikProfile.totalJobs,
+        totalHires: u.malikProfile.totalHires,
+        totalSpent: u.malikProfile.totalSpent,
+      };
+    }
+
+    return commonData;
+  }
+
+  /**
+   * Mark all incoming messages in a conversation as read
+   */
+  async markConversationAsRead(phoneNumber: string): Promise<any> {
+    const dbPhone = formatPhoneForDb(phoneNumber);
+
+    const updateResult = await prisma.whatsAppMessage.updateMany({
+      where: {
+        phoneNumber: dbPhone,
+        direction: 'INCOMING',
+        isRead: false
+      },
+      data: {
+        isRead: true
+      }
+    });
+
+    // Broadcast read event to all admin clients so they reset unread badge instantly
+    try {
+      emitToAdminWhatsapp('whatsapp:read', { phoneNumber: dbPhone });
+    } catch (socketErr) {
+      logger.error('Error emitting whatsapp:read via Socket.IO:', socketErr);
+    }
+
+    return { count: updateResult.count };
   }
 }

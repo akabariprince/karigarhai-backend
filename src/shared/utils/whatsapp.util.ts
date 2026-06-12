@@ -6,7 +6,10 @@ import { env } from '../../config/env';
  * Ensures Indian numbers have the country code prefix '91' and no '+' or spaces.
  */
 export const formatWhatsappPhone = (phone: string): string => {
-  const cleaned = phone.replace(/\D/g, '');
+  let cleaned = phone.replace(/\D/g, '');
+  if (cleaned.length === 11 && cleaned.startsWith('0')) {
+    cleaned = cleaned.substring(1);
+  }
   if (cleaned.length === 10) {
     return `91${cleaned}`;
   }
@@ -14,6 +17,20 @@ export const formatWhatsappPhone = (phone: string): string => {
     return cleaned;
   }
   return cleaned;
+};
+
+/**
+ * Formats a phone number for the database to standard E.164-like format (e.g. +919876543210)
+ */
+export const formatPhoneForDb = (phone: string): string => {
+  let cleaned = phone.replace(/\D/g, '');
+  if (cleaned.length === 11 && cleaned.startsWith('0')) {
+    cleaned = cleaned.substring(1);
+  }
+  if (cleaned.length === 10) {
+    return `+91${cleaned}`;
+  }
+  return `+${cleaned}`;
 };
 
 /**

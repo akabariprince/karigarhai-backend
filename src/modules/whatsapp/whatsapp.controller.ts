@@ -56,3 +56,23 @@ export const sendMessage = asyncHandler(async (req: AuthRequest, res: Response) 
   const result = await whatsappService.sendTextMessage(phoneNumber, text);
   sendResponse(res, 201, 'Message sent and stored successfully', result);
 });
+
+/**
+ * GET Registered user details for a phone number
+ * Admin only
+ */
+export const getUserInfo = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const { phoneNumber } = req.params;
+  const result = await whatsappService.getUserInfoByPhone(phoneNumber);
+  sendResponse(res, 200, 'User details fetched successfully', result);
+});
+
+/**
+ * PATCH Mark all messages in a conversation as read
+ * Admin only
+ */
+export const markAsRead = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const { phoneNumber } = req.params;
+  const result = await whatsappService.markConversationAsRead(phoneNumber);
+  sendResponse(res, 200, 'Conversation marked as read successfully', result);
+});

@@ -5,6 +5,7 @@ model WhatsAppMessage {
   content        String?
   messageType    String            // TEXT, IMAGE, AUDIO, VIDEO, DOCUMENT, etc.
   direction      WhatsAppDirection
+  isRead         Boolean           @default(false)
   conversationId String?
   timestamp      DateTime
   createdAt      DateTime          @default(now())
