@@ -141,7 +141,7 @@ export class WhatsappService {
 
     try {
       const response = await axios.post(
-        `https://graph.facebook.com/v23.0/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
+        `https://graph.facebook.com/v25.0/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
         payload,
         {
           headers: {

@@ -60,7 +60,7 @@ export const sendWhatsappOtp = async (phone: string, otp: string): Promise<any> 
   const config = {
     method: 'post',
     maxBodyLength: Infinity,
-    url: `https://graph.facebook.com/v23.0/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
+    url: `https://graph.facebook.com/v25.0/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${env.WHATSAPP_TOKEN}`,
